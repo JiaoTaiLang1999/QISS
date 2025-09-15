@@ -1,9 +1,10 @@
 # coding:utf-8
 import os
 import sys
+from pathlib import Path
 
 # 导入PyQt6基础模块
-from PyQt6.QtCore import Qt, pyqtSignal, QEasingCurve, QUrl
+from PyQt6.QtCore import Qt, pyqtSignal, QEasingCurve, QUrl, QSize
 from PyQt6.QtGui import QIcon, QDesktopServices, QPixmap
 from PyQt6.QtWidgets import (QLabel, QHBoxLayout, QVBoxLayout,
                              QApplication, QFrame, QWidget)
@@ -12,7 +13,7 @@ from PyQt6.QtWidgets import (QLabel, QHBoxLayout, QVBoxLayout,
 from qfluentwidgets import (NavigationBar, NavigationItemPosition,
                             MessageBox, isDarkTheme, setTheme, Theme,
                             setThemeColor, SearchLineEdit, PopUpAniStackedWidget,
-                            getFont)
+                            getFont, SplashScreen)
 from qfluentwidgets import FluentIcon as FIF  # Fluent风格图标
 
 # 导入无边框窗口支持
@@ -191,6 +192,7 @@ class Window(FramelessWindow):
     def __init__(self):
         super().__init__()
 
+
         # 设置自定义标题栏
         self.setTitleBar(CustomTitleBar(self))
 
@@ -342,7 +344,7 @@ class Window(FramelessWindow):
 
         # 设置窗口图标（容错处理）
         try:
-            self.setWindowIcon(QIcon('./res/img/logo.png'))
+            self.setWindowIcon(QIcon(str(Path('./res/img/logo.png'))))
         except:
             self.setWindowIcon(QIcon())  # 无图标时使用默认图标
 
@@ -391,7 +393,7 @@ class Window(FramelessWindow):
         color = 'dark' if isDarkTheme() else 'light'
         try:
             # 尝试加载样式文件
-            with open(f'res/{color}/demo.qss', encoding='utf-8') as f:
+            with open(Path("res") / color / "demo.qss", encoding='utf-8') as f:
                 self.setStyleSheet(f.read())
         except:
             # 没有样式文件时不设置（不影响功能）
@@ -418,7 +420,7 @@ class Window(FramelessWindow):
 
         # 如果点击了"来啦老弟"，打开支持链接
         if w.exec():
-            os.startfile(r".\res\HelpDocs.pdf")
+            os.startfile(str(Path("./res/HelpDocs.pdf")))
         else:
             print("用户取消查看帮助文档")
 
