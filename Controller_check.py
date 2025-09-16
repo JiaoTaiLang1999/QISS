@@ -382,9 +382,11 @@ def get_quality(source_path: str, tif_path: str) -> list[bool]:
     tif_stem = Path(tif_path).stem
     source_dir = Path(source_path)
     rpc_files = []
+    rpb_files = []  # 新增rpb文件列表
     try:
         # 搜索所有可能的RPC文件
         rpc_files = list(source_dir.rglob("*.rpc")) + list(source_dir.rglob("*_rpc.txt"))
+        rpb_files = list(source_dir.rglob("*.rpb"))  # 新增rpb文件搜索
     except PermissionError as e:
         print(f"[警告] 搜索RPC文件时权限不足：{str(e)}")
 
@@ -404,7 +406,21 @@ def get_quality(source_path: str, tif_path: str) -> list[bool]:
         if not exist_rpc:
             print(f"[RPC匹配失败] 影像 {tif_stem}：未找到匹配的RPC文件（共搜索到{len(rpc_files)}个RPC文件）")
 
-    return [is_open, is_bad, is_loss, exist_rpc]
+    # 新增：检查RPB文件
+    exist_rpb = False  # 新增rpb存在标记
+    if not rpb_files:
+        print(f"[RPB匹配] 影像 {tif_stem}：未找到任何RPB文件")
+    else:
+        for rpb_file in rpb_files:
+            rpb_stem = rpb_file.stem
+            if rpb_stem == tif_stem or rpb_stem == f"{tif_stem}_rpb":
+                exist_rpb = True
+                print(f"[RPB匹配成功] 影像 {tif_stem} 找到对应RPB文件：{rpb_file.name}")
+                break
+        if not exist_rpb:
+            print(f"[RPB匹配失败] 影像 {tif_stem}：未找到匹配的RPB文件（共搜索到{len(rpb_files)}个RPB文件）")
+
+    return [is_open, is_bad, is_loss, exist_rpc,exist_rpb]
 
 
 def get_tif(tifs: list[str], tifs_path: list[str], tif_type: str, source_path: str) -> np.ndarray:
@@ -584,7 +600,7 @@ def to_csv(tifs_message: np.ndarray, tifs_lack: np.ndarray, save_path: str) -> N
     if tifs_message.size > 0:
         msg_columns = [
             "影像型号", "卫星类型", "影像时相", "传感器类型", "传感器角度",
-            "分辨率", "是否能打开", "是否损坏", "光谱是否缺失", "是否存在rpc", "云占比"
+            "分辨率", "是否能打开", "是否损坏", "光谱是否缺失", "是否存在rpc","是否存在rpb", "云占比"
         ]
         msg_df = pd.DataFrame(tifs_message, columns=msg_columns)
         msg_csv_path = save_dir / "message.csv"
@@ -699,7 +715,22 @@ def Controller_check_main(img_path):
 
         # 4. 逐个处理每张影像（原始循环逻辑）
         for idx, img_file in enumerate(valid_tif_paths, 1):  # 改为处理有效文件，避免重复处理无效文件
-            print(f"\n[处理进度] 正在处理第 {idx}/{len(valid_tif_paths)} 张影像：{Path(img_file).name}")
+            file_path = Path(img_file)
+            try:
+                file_size = file_path.stat().st_size  # 获取字节数
+                # 按1024进制转换为最合适的单位
+                if file_size >= 1024 ** 3:  # 1GB及以上
+                    file_size_str = f"{file_size / (1024 ** 3):.2f} GB"
+                elif file_size >= 1024 ** 2:  # 1MB至1GB之间
+                    file_size_str = f"{file_size / (1024 ** 2):.2f} MB"
+                else:  # 1MB以下，用KB
+                    file_size_str = f"{file_size / 1024:.2f} KB"
+            except PermissionError:
+                file_size_str = "无法获取（权限不足）"
+            except Exception as e:
+                file_size_str = f"获取失败：{str(e)[:10]}"
+
+            print(f"\n[处理进度] 正在处理第 {idx}/{len(valid_tif_paths)} 张影像：{Path(img_file).name}（大小：{file_size_str}）")
             # 单张影像处理（传入单文件列表）
             tif_msg, tif_lack = main([img_file], img_path)
             # 收集结果（过滤空数组）
@@ -736,5 +767,5 @@ def Controller_check_main(img_path):
         # import traceback
         # traceback.print_exc()
 
-img_path = r"D:\JM\lzy\test_data2"
+img_path = r"G:\lzy_IQaDS_system\lzy_IQaDS_system_test_data\data_8\TEST"
 Controller_check_main(img_path)
