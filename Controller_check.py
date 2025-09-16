@@ -1,13 +1,11 @@
-def Controller_check(ui):
-    ui.pushButton_2.clicked.connect(lambda: ui.label.setText("我是检查"))
-
-
 import numpy as np
 import pandas as pd
 from pathlib import Path
 from osgeo import gdal
 from collections import defaultdict
 
+# 启用异常处理
+gdal.UseExceptions()
 
 def search_tif(source_path: str) -> list[str]:
     """
@@ -18,24 +16,27 @@ def search_tif(source_path: str) -> list[str]:
         所有TIF文件的绝对路径列表（字符串）
     """
     """递归搜索TIF文件，先校验路径合法性"""
-    # 1. 转换为Path对象，便于后续操作
-    source_dir = Path(source_path).absolute()  # 转为绝对路径，避免相对路径歧义
+    # 1. 转换为Path对象，便于后续操作（新增异常捕获）
+    try:
+        source_dir = Path(source_path).absolute()  # 转为绝对路径，避免相对路径歧义
+    except Exception as e:
+        raise ValueError(f"[错误] 路径格式非法：{source_path}\n错误原因：{str(e)}（可能包含特殊字符或无效符号）") from e
 
-    # 2. 校验路径是否存在
+    # 2. 校验路径是否存在（原有逻辑保留）
     if not source_dir.exists():
         raise ValueError(
             f"【路径不存在】输入的影像文件夹路径不存在：{source_dir}\n"
             "请检查：① 路径是否拼写正确；② 文件是否被移动/删除"
         )
 
-    # 3. 校验路径是否为文件夹（而非文件）
+    # 3. 校验路径是否为文件夹（而非文件）（原有逻辑保留）
     if not source_dir.is_dir():
         raise ValueError(
             f"【路径类型错误】输入的路径是文件而非文件夹：{source_dir}\n"
             "请传入影像所在的文件夹路径（如D:\\JM\\lzy\\test_data2），而非单个文件路径"
         )
 
-    # 4. 校验是否有目录访问权限（避免Windows/Linux权限不足）
+    # 4. 校验是否有目录访问权限（避免Windows/Linux权限不足）（原有逻辑保留）
     try:
         # 尝试列出目录内1个文件，验证权限
         next(source_dir.iterdir(), None)  # 无文件时返回None，不报错
@@ -45,12 +46,21 @@ def search_tif(source_path: str) -> list[str]:
             "请检查：① Windows：右键文件夹→属性→安全→添加当前用户的读写权限；② Linux：chmod +rwx 目录路径"
         )
 
-    # 5. 正常搜索TIF文件
-    tif_files = [str(file) for file in source_dir.rglob("*.tif")]
-    tiff_files = [str(file) for file in source_dir.rglob("*.tiff")]
+    # 5. 正常搜索TIF文件（新增子文件夹搜索权限异常捕获）
+    try:
+        tif_files = [str(file) for file in source_dir.rglob("*.tif")]
+        tiff_files = [str(file) for file in source_dir.rglob("*.tiff")]
+    except PermissionError as e:
+        raise PermissionError(
+            f"【权限不足】搜索子文件夹时被拒绝：{str(e)}\n"
+            "请检查子文件夹的访问权限（如Windows子文件夹安全设置、Linux文件权限）"
+        ) from e
+    except Exception as e:
+        raise RuntimeError(f"【搜索错误】递归搜索TIF文件时出错：{str(e)}") from e
+
     all_tif = tiff_files + tif_files
 
-    # 6. 若未找到TIF，给出明确提示（而非静默处理）
+    # 6. 若未找到TIF，给出明确提示（而非静默处理）（原有逻辑保留）
     if not all_tif:
         raise FileNotFoundError(
             f"【无TIF文件】在文件夹 {source_dir} 及其子文件夹中未找到任何 .tif 或 .tiff 文件\n"
@@ -70,17 +80,29 @@ def get_tif_id(tif_name: str, sate_type: str) -> str:
     返回：
         影像ID（用于分组），异常时返回原文件名
     """
+
+    # 新增：参数类型校验
+    if not isinstance(tif_name, str):
+        raise TypeError(f"[错误] tif_name 必须是字符串类型，当前为 {type(tif_name).__name__}")
+    if not isinstance(sate_type, str):
+        raise TypeError(f"[错误] sate_type 必须是字符串类型，当前为 {type(sate_type).__name__}")
+    # 新增：空字符串校验
+    if not tif_name.strip():
+        raise ValueError("[错误] tif_name 不能为空字符串")
+    if not sate_type.strip():
+        raise ValueError("[错误] sate_type 不能为空字符串")
+
     parts = tif_name.split("_")  # 预分割，减少重复计算
     try:
         if sate_type in ("GF1", "GF2", "GF6", "ZY1"):
-            return tif_name.split("-")[-1].split("-")[0]  # 等价于原逻辑的 split('_')[-1].split('-')[0]
+            return tif_name.split("_")[-1].split("-")[0]  # 等价于原逻辑的 split('_')[-1].split('-')[0]
         elif sate_type == "GF7":
             return parts[-1]
-        elif sate_type == "zy3":
+        elif sate_type in ("zy303a","zy302a"):
             return f"{parts[2]}_{parts[3]}"
-        elif sate_type in ("SV1", "SV-"):
+        elif sate_type in ("SV1-03", "SV-2"):
             return parts[2]
-        elif sate_type == "TH0":
+        elif sate_type in ("TH01-01","TH01-02","TH01-03","TH01-04"):
             return f"{parts[-2]}_{parts[-1]}"
         else:
             return tif_name  # 未知卫星类型，返回原文件名避免分组失败
@@ -100,12 +122,22 @@ def preprocess_tif(tif_names: list[str]) -> tuple[list[str], list[list[str]], li
         tifs: 分组后的影像名称列表（每个元素是同一ID的影像名称集合）
         tifs_path: 分组后的影像路径列表（每个元素是同一ID的影像路径集合）
     """
+
+    # 新增：参数类型校验
+    if not isinstance(tif_names, list):
+        raise TypeError(f"[错误] tif_names 必须是列表类型，当前为 {type(tif_names).__name__}")
+    for idx, path in enumerate(tif_names):
+        if not isinstance(path, str):
+            raise TypeError(f"[错误] tif_names 列表中第{idx + 1}个元素必须是字符串路径，当前为 {type(path).__name__}")
+        if not Path(path).exists():
+            raise FileNotFoundError(f"[错误] tif_names 列表中第{idx + 1}个路径不存在：{path}")
+
     # 第一步：提取每个TIF的核心信息（卫星类型、文件名、路径）
     tif_info = []
     for tif_path in tif_names:
         path_obj = Path(tif_path)
         tif_name = path_obj.stem  # 不带后缀的文件名（如 "GF1_20230101_xxx"）
-        sate_type = tif_name[:3]  # 卫星类型：文件名前3个字符（原始逻辑）
+        sate_type = tif_name.split("_")[0]  # 卫星类型：按"_"分割，取第一部分
         tif_info.append((sate_type, tif_name, tif_path))
 
     # 第二步：按「卫星类型→影像ID」二级分组（用defaultdict简化逻辑）
@@ -196,7 +228,7 @@ def get_message(tif_name: str, sate_type: str) -> list:
                 sensor_angle = "前视"
                 resolution = "0.8m"
 
-        elif sate_type == "zy3":
+        elif sate_type in ("zy303a","zy302a"):
             tif_time = parts[4][:8]
             sensor_prefix = parts[1][0]
             if sensor_prefix == "b":
@@ -226,7 +258,7 @@ def get_message(tif_name: str, sate_type: str) -> list:
                 sensor_type = "全色"
                 resolution = "2.5m"
 
-        elif sate_type == "SV1":
+        elif sate_type == "SV1-03":
             tif_time = parts[1]
             sensor_prefix = tif_name.split("-")[-1][0]
             if sensor_prefix == "M":
@@ -236,7 +268,7 @@ def get_message(tif_name: str, sate_type: str) -> list:
                 sensor_type = "全色"
                 resolution = "0.5m"
 
-        elif sate_type == "SV-":
+        elif sate_type == "SV-2":
             tif_time = parts[1]
             sensor_prefix = tif_name.split("-")[-1][0]
             if sensor_prefix == "M":
@@ -246,7 +278,7 @@ def get_message(tif_name: str, sate_type: str) -> list:
                 sensor_type = "全色"
                 resolution = "0.5m"
 
-        elif sate_type == "TH0":
+        elif sate_type in ("TH01-01","TH01-02","TH01-03","TH01-04"):
             tif_time = parts[1][1:9]  # 时间取第2-9位（如 "T20230101" → "20230101"）
             sensor_prefix = parts[3][0]
             angle = parts[4]
@@ -291,41 +323,67 @@ def get_quality(source_path: str, tif_path: str) -> list[bool]:
     is_bad = False  # 影像是否损坏（0值像素占比>30%）
     is_loss = False  # 光谱是否缺失（波段数<1）
     exist_rpc = False  # 是否存在对应的RPC文件
+    data = None  # 初始化GDAL数据集，用于后续关闭
 
     # 1. 评估影像可打开性和完整性
-    data = gdal.Open(tif_path)
-    if data is not None:
-        is_open = True
-        try:
-            # 读取全影像数据（原始逻辑：从(0,0)开始读取全部像素）
-            data_np = data.ReadAsArray(0, 0, data.RasterXSize, data.RasterYSize)
-            # 计算坏像素比例（0值像素）
-            bad_count = np.sum(data_np == 0)
-            total_count = np.prod(data_np.shape)  # 总像素数 = 波段数 × 宽度 × 高度
-            # 避免除以0（极端情况：空影像）
-            is_bad = (bad_count / total_count) > 0.3 if total_count > 0 else False
-            # 判断光谱是否缺失（波段数≥1则不缺失）
-            is_loss = data_np.shape[0] < 1 if data_np.ndim >= 1 else True
-        except Exception as e:
-            # 读取数据失败视为「光谱缺失」
-            is_loss = True
-            print(f"[警告] 读取影像 {Path(tif_path).name} 失败：{str(e)}")
-    else:
-        print(f"[警告] 影像 {Path(tif_path).name} 无法打开")
+    try:
+        data = gdal.Open(tif_path)
+        if data is not None:
+            is_open = True
+            try:
+                # 读取全影像数据（原始逻辑：从(0,0)开始读取全部像素）
+                data_np = data.ReadAsArray(0, 0, data.RasterXSize, data.RasterYSize)
+                # 新增：处理ReadAsArray返回None的极端情况（如文件损坏）
+                if data_np is None:
+                    raise ValueError("影像数据读取返回空值，可能为损坏文件")
+
+                # 计算坏像素比例（0值像素）
+                bad_count = np.sum(data_np == 0)
+                total_count = np.prod(data_np.shape)  # 总像素数 = 波段数 × 宽度 × 高度
+                # 避免除以0（极端情况：空影像）
+                is_bad = (bad_count / total_count) > 0.3 if total_count > 0 else False
+                # 判断光谱是否缺失（波段数≥1则不缺失）
+                is_loss = data_np.shape[0] < 1 if data_np.ndim >= 1 else True
+            except Exception as e:
+                # 读取数据失败视为「光谱缺失」
+                is_loss = True
+                print(f"[警告] 读取影像 {Path(tif_path).name} 失败：{str(e)}")
+        else:
+            print(f"[警告] 影像 {Path(tif_path).name} 无法打开")
+    except Exception as e:
+        # 新增：捕获GDAL打开文件时的意外异常（如文件被占用、格式错误）
+        print(f"[错误] 处理影像 {Path(tif_path).name} 时出错：{str(e)}")
+        is_loss = True  # 标记为光谱缺失
+    finally:
+        # 新增：显式关闭GDAL数据集，释放资源
+        if data is not None:
+            del data  # GDAL数据集无close()，通过del释放
 
     # 2. 检查RPC文件（两种格式：{影像名}.rpc 或 {影像名}_rpc.txt，保留原始打印）
     tif_stem = Path(tif_path).stem
     source_dir = Path(source_path)
-    # 递归搜索所有RPC文件
-    rpc_files = list(source_dir.rglob("*.rpc")) + list(source_dir.rglob("*_rpc.txt"))
+    rpc_files = []
+    try:
+        # 搜索所有可能的RPC文件
+        rpc_files = list(source_dir.rglob("*.rpc")) + list(source_dir.rglob("*_rpc.txt"))
+    except PermissionError as e:
+        print(f"[警告] 搜索RPC文件时权限不足：{str(e)}")
 
-    for rpc_file in rpc_files:
-        rpc_stem = rpc_file.stem
-        print(f"[RPC匹配] tif_name: {tif_stem}, rpc_name: {rpc_stem}")
-        # 两种匹配规则：完全一致 或 RPC名=影像名+"_rpc"
-        if rpc_stem == tif_stem or rpc_stem == f"{tif_stem}_rpc":
-            exist_rpc = True
-            break  # 找到匹配项即可退出循环
+    # 优化点1：仅在有RPC文件时才检查，无RPC文件直接提示
+    if not rpc_files:
+        print(f"[RPC匹配] 影像 {tif_stem}：未找到任何RPC文件")
+    else:
+        # 优化点2：遍历RPC文件，只打印匹配成功的日志，找到后立即退出
+        for rpc_file in rpc_files:
+            rpc_stem = rpc_file.stem
+            # 匹配规则：RPC文件名与影像名完全一致，或RPC名=影像名+"_rpc"
+            if rpc_stem == tif_stem or rpc_stem == f"{tif_stem}_rpc":
+                exist_rpc = True
+                print(f"[RPC匹配成功] 影像 {tif_stem} 找到对应RPC文件：{rpc_file.name}")
+                break  # 找到匹配后立即停止检查
+        # 优化点3：所有RPC文件都不匹配时，只打印一条总结日志
+        if not exist_rpc:
+            print(f"[RPC匹配失败] 影像 {tif_stem}：未找到匹配的RPC文件（共搜索到{len(rpc_files)}个RPC文件）")
 
     return [is_open, is_bad, is_loss, exist_rpc]
 
@@ -401,7 +459,7 @@ def get_lack(tif_message: np.ndarray, tif_type: str) -> np.ndarray:
         if np.sum(sensor_types == "多光谱") == 0:
             lack_list.append([tifs_id, "多光谱", "后视", "3.2m"])
 
-    elif tif_type == "zy3":
+    elif tif_type in ("zy303a","zy302a"):
         # 原始逻辑：下视缺失时填"前视"，此处保留
         has_p_back = np.sum((sensor_types == "全色") & (sensor_angles == "后视")) == 0
         has_p_front = np.sum((sensor_types == "全色") & (sensor_angles == "前视")) == 0
@@ -421,13 +479,13 @@ def get_lack(tif_message: np.ndarray, tif_type: str) -> np.ndarray:
         if np.sum(sensor_types == "多光谱") == 0:
             lack_list.append([tifs_id, "多光谱", "-", "10m"])
 
-    elif tif_type in ("SV1", "SV-"):
+    elif tif_type in ("SV1-03", "SV-2"):
         if np.sum(sensor_types == "全色") == 0:
             lack_list.append([tifs_id, "全色", "-", "0.5m"])
         if np.sum(sensor_types == "多光谱") == 0:
             lack_list.append([tifs_id, "多光谱", "-", "2m"])
 
-    elif tif_type == "TH0":
+    elif tif_type in ("TH01-01","TH01-02","TH01-03","TH01-04"):
         has_p_front = np.sum((sensor_types == "全色") & (sensor_angles == "前视")) == 0
         has_p_down = np.sum((sensor_types == "全色") & (sensor_angles == "下视")) == 0
         has_p_back = np.sum((sensor_types == "全色") & (sensor_angles == "后视")) == 0
@@ -460,16 +518,23 @@ def get_tifs(tifs: list[list[str]], tifs_path: list[list[str]], tif_types: list[
     all_messages = []
     all_lacks = []
 
-    for group_names, group_paths, sate_type in zip(tifs, tifs_path, tif_types):
-        # 处理单组影像
-        group_msg = get_tif(group_names, group_paths, sate_type, source_path)
-        group_lack = get_lack(group_msg, sate_type)
+    # 遍历每组影像（新增try-except隔离单组异常）
+    for idx, (group_names, group_paths, sate_type) in enumerate(zip(tifs, tifs_path, tif_types), 1):
+        try:
+            # 处理单组影像（原有逻辑保留）
+            group_msg = get_tif(group_names, group_paths, sate_type, source_path)
+            group_lack = get_lack(group_msg, sate_type)
 
-        # 收集结果（过滤空数组，避免vstack报错）
-        if group_msg.size > 0:
-            all_messages.append(group_msg)
-        if group_lack.size > 0:
-            all_lacks.append(group_lack)
+            # 收集结果（过滤空数组，避免vstack报错）
+            if group_msg.size > 0:
+                all_messages.append(group_msg)
+            if group_lack.size > 0:
+                all_lacks.append(group_lack)
+            print(f"[处理成功] 第{idx}组影像（卫星类型：{sate_type}）处理完成")
+        except Exception as e:
+            # 新增：捕获单组处理异常，跳过该组但继续后续处理
+            group_name_sample = group_names[0] if group_names else "未知组"
+            print(f"[错误] 第{idx}组影像（{group_name_sample}）处理失败，跳过该组：{str(e)}")
 
     # 合并所有组结果（匹配原始返回格式）
     merged_msg = np.vstack(all_messages) if all_messages else np.array([])
@@ -486,7 +551,15 @@ def to_csv(tifs_message: np.ndarray, tifs_lack: np.ndarray, save_path: str) -> N
         save_path: 保存文件夹路径
     """
     save_dir = Path(save_path)
-    save_dir.mkdir(parents=True, exist_ok=True)  # 确保保存路径存在
+    # 确保保存路径存在（原有逻辑保留）
+    try:
+        save_dir.mkdir(parents=True, exist_ok=True)
+    except PermissionError as e:
+        # 新增：捕获创建文件夹权限不足的异常
+        raise PermissionError(f"[错误] 无法创建保存文件夹 {save_dir}：{str(e)}\n请检查文件夹权限") from e
+    except Exception as e:
+        # 新增：捕获创建文件夹的其他异常（如路径非法）
+        raise RuntimeError(f"[错误] 创建保存文件夹 {save_dir} 失败：{str(e)}") from e
 
     # 1. 保存影像信息CSV
     if tifs_message.size > 0:
@@ -495,8 +568,19 @@ def to_csv(tifs_message: np.ndarray, tifs_lack: np.ndarray, save_path: str) -> N
             "分辨率", "是否能打开", "是否损坏", "光谱是否缺失", "是否存在rpc", "云占比"
         ]
         msg_df = pd.DataFrame(tifs_message, columns=msg_columns)
-        msg_df.to_csv(save_dir / "message.csv", index=False, encoding="utf-8-sig")
-        print(f"[保存成功] 影像信息已保存至：{save_dir / 'message.csv'}")
+        msg_csv_path = save_dir / "message.csv"
+        try:
+            msg_df.to_csv(msg_csv_path, index=False, encoding="utf-8-sig")
+            print(f"[保存成功] 影像信息已保存至：{msg_csv_path}")
+        except PermissionError as e:
+            # 新增：捕获保存文件权限不足
+            print(f"[错误] 保存影像信息失败（{msg_csv_path}）：无写入权限，请检查文件是否被占用或文件夹权限")
+        except IOError as e:
+            # 新增：捕获磁盘满、文件损坏等IO错误
+            print(f"[错误] 保存影像信息失败（{msg_csv_path}）：{str(e)}（可能磁盘空间不足或文件损坏）")
+        except Exception as e:
+            # 新增：捕获其他意外异常
+            print(f"[错误] 保存影像信息失败（{msg_csv_path}）：{str(e)}")
     else:
         print("[警告] 无影像信息可保存，不生成 message.csv")
 
@@ -504,8 +588,16 @@ def to_csv(tifs_message: np.ndarray, tifs_lack: np.ndarray, save_path: str) -> N
     if tifs_lack.size > 0:
         lack_columns = ["影像型号", "缺失传感器类型", "缺失传感器角度", "缺失影像分辨率"]
         lack_df = pd.DataFrame(tifs_lack, columns=lack_columns)
-        lack_df.to_csv(save_dir / "lack.csv", index=False, encoding="utf-8-sig")
-        print(f"[保存成功] 缺失记录已保存至：{save_dir / 'lack.csv'}")
+        lack_csv_path = save_dir / "lack.csv"
+        try:
+            lack_df.to_csv(lack_csv_path, index=False, encoding="utf-8-sig")
+            print(f"[保存成功] 缺失记录已保存至：{lack_csv_path}")
+        except PermissionError as e:
+            print(f"[错误] 保存缺失记录失败（{lack_csv_path}）：无写入权限，请检查文件是否被占用或文件夹权限")
+        except IOError as e:
+            print(f"[错误] 保存缺失记录失败（{lack_csv_path}）：{str(e)}（可能磁盘空间不足或文件损坏）")
+        except Exception as e:
+            print(f"[错误] 保存缺失记录失败（{lack_csv_path}）：{str(e)}")
     else:
         print("[提示] 无缺失影像，不生成 lack.csv")
 
@@ -571,40 +663,59 @@ def validate_tif_files(tif_paths: list[str]) -> list[str]:
     return valid_tifs
 
 
-if __name__ == "__main__":
+# 影像检查运行主函数
+def Controller_check_main(img_path):
     # 原始逻辑：逐个处理每张影像，再合并结果（严格保留）
-    img_path = r"D:\JM\lzy\test_data2"  # 替换为你的影像文件夹路径
-    img_names = search_tif(img_path)  # 搜索所有TIF文件
+    try:
+          # 替换为你的影像文件夹路径
+        # 1. 搜索所有TIF文件
+        img_names = search_tif(img_path)
 
-    # 校验文件是否为有效影像
-    valid_tif_paths = validate_tif_files(img_names)
+        # 2. 校验文件是否为有效影像
+        valid_tif_paths = validate_tif_files(img_names)
 
-    # 初始化结果容器
-    all_tifs_message = []
-    all_tifs_lack = []
+        # 3. 初始化结果容器
+        all_tifs_message = []
+        all_tifs_lack = []
 
-    # 逐个处理每张影像（原始循环逻辑）
-    for idx, img_file in enumerate(img_names, 1):
-        print(f"\n[处理进度] 正在处理第 {idx}/{len(img_names)} 张影像：{Path(img_file).name}")
-        # 单张影像处理（传入单文件列表）
-        tif_msg, tif_lack = main([img_file], img_path)
-        # 收集结果（过滤空数组）
-        if tif_msg.size > 0:
-            all_tifs_message.append(tif_msg)
-        if tif_lack.size > 0:
-            all_tifs_lack.append(tif_lack)
+        # 4. 逐个处理每张影像（原始循环逻辑）
+        for idx, img_file in enumerate(valid_tif_paths, 1):  # 改为处理有效文件，避免重复处理无效文件
+            print(f"\n[处理进度] 正在处理第 {idx}/{len(valid_tif_paths)} 张影像：{Path(img_file).name}")
+            # 单张影像处理（传入单文件列表）
+            tif_msg, tif_lack = main([img_file], img_path)
+            # 收集结果（过滤空数组）
+            if tif_msg.size > 0:
+                all_tifs_message.append(tif_msg)
+            if tif_lack.size > 0:
+                all_tifs_lack.append(tif_lack)
 
-    # 合并所有影像结果并保存
-    if all_tifs_message:
-        merged_all_msg = np.vstack(all_tifs_message)
-    else:
-        merged_all_msg = np.array([])
+        # 5. 合并所有影像结果并保存
+        if all_tifs_message:
+            merged_all_msg = np.vstack(all_tifs_message)
+        else:
+            merged_all_msg = np.array([])
 
-    if all_tifs_lack:
-        merged_all_lack = np.vstack(all_tifs_lack)
-    else:
-        merged_all_lack = np.array([])
+        if all_tifs_lack:
+            merged_all_lack = np.vstack(all_tifs_lack)
+        else:
+            merged_all_lack = np.array([])
 
-    # 保存CSV
-    to_csv(merged_all_msg, merged_all_lack, img_path)
-    print(f"\n[处理完成] 所有影像已处理完毕，结果保存至：{Path(img_path).absolute()}")
+        # 6. 保存CSV
+        to_csv(merged_all_msg, merged_all_lack, img_path)
+        print(f"\n[处理完成] 所有影像已处理完毕，结果保存至：{Path(img_path).absolute()}")
+
+    # 新增：全局异常捕获，友好提示错误信息
+    except ValueError as e:
+        print(f"\n[终止错误-参数/路径问题] {str(e)}")
+    except PermissionError as e:
+        print(f"\n[终止错误-权限问题] {str(e)}")
+    except FileNotFoundError as e:
+        print(f"\n[终止错误-文件缺失] {str(e)}")
+    except Exception as e:
+        print(f"\n[终止错误-未知异常] {str(e)}")
+        # 可选：打印异常堆栈，便于调试（生产环境可注释）
+        # import traceback
+        # traceback.print_exc()
+
+img_path = r"D:\JM\lzy\test_data2"
+Controller_check_main(img_path)
