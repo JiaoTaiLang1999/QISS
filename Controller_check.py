@@ -331,19 +331,38 @@ def get_quality(source_path: str, tif_path: str) -> list[bool]:
         if data is not None:
             is_open = True
             try:
-                # 读取全影像数据（原始逻辑：从(0,0)开始读取全部像素）
-                data_np = data.ReadAsArray(0, 0, data.RasterXSize, data.RasterYSize)
-                # 新增：处理ReadAsArray返回None的极端情况（如文件损坏）
-                if data_np is None:
-                    raise ValueError("影像数据读取返回空值，可能为损坏文件")
+                # 获取影像尺寸
+                x_size = data.RasterXSize
+                y_size = data.RasterYSize
+                band_count = data.RasterCount
 
-                # 计算坏像素比例（0值像素）
-                bad_count = np.sum(data_np == 0)
-                total_count = np.prod(data_np.shape)  # 总像素数 = 波段数 × 宽度 × 高度
-                # 避免除以0（极端情况：空影像）
-                is_bad = (bad_count / total_count) > 0.3 if total_count > 0 else False
-                # 判断光谱是否缺失（波段数≥1则不缺失）
-                is_loss = data_np.shape[0] < 1 if data_np.ndim >= 1 else True
+                # 定义块大小（根据内存调整，如512x512）
+                block_size = 512
+                total_bad = 0
+                total_pixels = 0
+
+                # 分块遍历影像
+                for y in range(0, y_size, block_size):
+                    # 计算当前块的实际高度（最后一块可能不足block_size）
+                    current_y_size = min(block_size, y_size - y)
+                    for x in range(0, x_size, block_size):
+                        current_x_size = min(block_size, x_size - x)
+
+                        # 分块读取数据（仅读取当前块）
+                        data_block = data.ReadAsArray(x, y, current_x_size, current_y_size)
+                        if data_block is None:
+                            raise ValueError(f"读取块({x},{y})失败")
+
+                        # 累加坏像素和总像素数
+                        block_bad = np.sum(data_block == 0)
+                        block_total = np.prod(data_block.shape)
+                        total_bad += block_bad
+                        total_pixels += block_total
+
+                # 计算坏像素比例（避免除零）
+                is_bad = (total_bad / total_pixels) > 0.3 if total_pixels > 0 else False
+                # 光谱缺失判断（只要有1个波段即不缺失）
+                is_loss = band_count < 1
             except Exception as e:
                 # 读取数据失败视为「光谱缺失」
                 is_loss = True
