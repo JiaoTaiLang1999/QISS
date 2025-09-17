@@ -1,8 +1,17 @@
 import numpy as np
 import pandas as pd
 from pathlib import Path
+
+from PyQt6.QtWidgets import QHBoxLayout
 from osgeo import gdal
 from collections import defaultdict
+
+from qfluentwidgets import CommandBar, TransparentDropDownPushButton, FluentIcon, RoundMenu, setFont, Action
+
+# --------------------------------------------------------------------------------------------------------------------------------
+# 核心功能区
+# --------------------------------------------------------------------------------------------------------------------------------
+
 
 # 启用异常处理
 gdal.UseExceptions()
@@ -768,4 +777,15 @@ def Controller_check_main(img_path):
         # traceback.print_exc()
 
 img_path = r"G:\lzy_IQaDS_system\lzy_IQaDS_system_test_data\data_8\TEST"
-Controller_check_main(img_path)
+# Controller_check_main(img_path)
+
+
+
+
+# --------------------------------------------------------------------------------------------------------------------------------
+# 界面编写区
+# --------------------------------------------------------------------------------------------------------------------------------
+
+
+def Controller_check(ui):
+    pass
