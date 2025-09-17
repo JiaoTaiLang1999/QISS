@@ -787,8 +787,8 @@ img_path = r"G:\lzy_IQaDS_system\lzy_IQaDS_system_test_data\data_8\TEST"
 # 界面编写区
 # --------------------------------------------------------------------------------------------------------------------------------
 
-
-def Controller_check(ui):
+# 工具栏
+def toolBar(ui):
     """初始化check页面的控制器，添加带间距的CommandBar顶部工具栏"""
     # 获取顶部操作区容器（page_2_check中的widget）
     top_widget = ui.widget_check_1_toolBar
@@ -832,31 +832,7 @@ def Controller_check(ui):
     add_button(FluentIcon.COPY, '复制路径')
     add_button(FluentIcon.SHARE, '分享结果')
 
-    # 创建下拉菜单按钮（适配容器高度，保留边距）
-    def create_dropdown_button():
-        button = TransparentDropDownPushButton('菜单', top_widget, FluentIcon.MENU)
-        button.setFixedHeight(command_bar.height())  # 与CommandBar高度一致
-        setFont(button, 12)
 
-        menu = RoundMenu(parent=top_widget)
-        menu.addActions([
-            Action(FluentIcon.COPY, '复制'),
-            Action(FluentIcon.CUT, '剪切'),
-            Action(FluentIcon.PASTE, '粘贴'),
-            Action(FluentIcon.CANCEL, '取消'),
-            Action('全选'),
-        ])
-        button.setMenu(menu)
-        return button
-
-    # 添加下拉按钮到CommandBar
-    dropdown_button = create_dropdown_button()
-    command_bar.addWidget(dropdown_button)
-
-    # 添加隐藏动作
-    command_bar.addHiddenAction(
-        Action(FluentIcon.SCROLL, '排序文件', triggered=lambda: print("排序文件"))
-    )
-    command_bar.addHiddenAction(
-        Action(FluentIcon.SETTING, '批量设置', shortcut='Ctrl+S')
-    )
+def Controller_check(ui):
+    # 加载工具栏
+    toolBar(ui)
