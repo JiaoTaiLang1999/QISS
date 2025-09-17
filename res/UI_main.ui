@@ -19,7 +19,7 @@
      <property name="currentIndex">
       <number>1</number>
      </property>
-     <widget class="QWidget" name="page">
+     <widget class="QWidget" name="page_1_home">
       <layout class="QVBoxLayout" name="verticalLayout">
        <item>
         <widget class="QLabel" name="label_5">
@@ -45,10 +45,10 @@
        </item>
       </layout>
      </widget>
-     <widget class="QWidget" name="page_2">
+     <widget class="QWidget" name="page_2_check">
       <layout class="QVBoxLayout" name="verticalLayout_5">
        <item>
-        <widget class="QWidget" name="widget" native="true">
+        <widget class="QWidget" name="widget_check_1_toolBar" native="true">
          <property name="minimumSize">
           <size>
            <width>0</width>
@@ -65,11 +65,23 @@
         </widget>
        </item>
        <item>
-        <widget class="QWidget" name="widget_2" native="true"/>
+        <widget class="QWidget" name="widget_check_2_display" native="true">
+         <layout class="QHBoxLayout" name="horizontalLayout_3">
+          <item>
+           <widget class="QWidget" name="widget_check_display_1_chartAndLog" native="true"/>
+          </item>
+          <item>
+           <widget class="QWidget" name="widget_check_display_2_table" native="true"/>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <widget class="QWidget" name="widget_check_3_statusBar" native="true"/>
        </item>
       </layout>
      </widget>
-     <widget class="QWidget" name="page_3">
+     <widget class="QWidget" name="page_3_cloud">
       <layout class="QVBoxLayout" name="verticalLayout_4">
        <item>
         <widget class="QLabel" name="label_2">
@@ -95,7 +107,7 @@
        </item>
       </layout>
      </widget>
-     <widget class="QWidget" name="page_4">
+     <widget class="QWidget" name="page_4_select">
       <layout class="QVBoxLayout" name="verticalLayout_3">
        <item>
         <widget class="QLabel" name="label_3">
@@ -121,7 +133,7 @@
        </item>
       </layout>
      </widget>
-     <widget class="QWidget" name="page_5">
+     <widget class="QWidget" name="page_5_setting">
       <layout class="QVBoxLayout" name="verticalLayout_6">
        <item>
         <widget class="QLabel" name="label_4">

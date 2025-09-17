@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 from pathlib import Path
 
+from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QHBoxLayout
 from osgeo import gdal
 from collections import defaultdict
@@ -788,4 +789,74 @@ img_path = r"G:\lzy_IQaDS_system\lzy_IQaDS_system_test_data\data_8\TEST"
 
 
 def Controller_check(ui):
-    pass
+    """初始化check页面的控制器，添加带间距的CommandBar顶部工具栏"""
+    # 获取顶部操作区容器（page_2_check中的widget）
+    top_widget = ui.widget_check_1_toolBar
+
+    # 设置工具栏固定高度（适当增加以容纳间距，如48px）
+    top_widget.setFixedHeight(48)
+
+    # 清空原有布局并重新设置（保留间距）
+    if top_widget.layout():
+        # 移除原有所有子组件
+        while top_widget.layout().count():
+            item = top_widget.layout().takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+    else:
+        # 创建水平布局，保留适当边距和间距（关键：不消除间距）
+        top_layout = QHBoxLayout(top_widget)
+        top_layout.setContentsMargins(10, 6, 10, 6)  # 上下边距6px，左右边距10px
+        top_layout.setSpacing(8)  # 组件之间间距8px（保留间隔）
+        top_widget.setLayout(top_layout)
+
+    # 创建CommandBar并添加到布局
+    command_bar = CommandBar(top_widget)
+    top_widget.layout().addWidget(command_bar)
+
+    # 设置CommandBar样式（高度与父容器适配，保留内部间距）
+    command_bar.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+    command_bar.setFixedHeight(top_widget.height() - 12)  # 减去上下边距，避免内容溢出
+    setFont(command_bar, 12)
+
+    # 添加按钮的函数
+    def add_button(icon, text):
+        action = Action(icon, text, top_widget)
+        action.triggered.connect(lambda: print(f"点击了 {text} 按钮"))
+        command_bar.addAction(action)
+
+    # 添加按钮组
+    add_button(FluentIcon.ADD, '添加文件')
+    command_bar.addSeparator()
+    add_button(FluentIcon.EDIT, '编辑影像')
+    add_button(FluentIcon.COPY, '复制路径')
+    add_button(FluentIcon.SHARE, '分享结果')
+
+    # 创建下拉菜单按钮（适配容器高度，保留边距）
+    def create_dropdown_button():
+        button = TransparentDropDownPushButton('菜单', top_widget, FluentIcon.MENU)
+        button.setFixedHeight(command_bar.height())  # 与CommandBar高度一致
+        setFont(button, 12)
+
+        menu = RoundMenu(parent=top_widget)
+        menu.addActions([
+            Action(FluentIcon.COPY, '复制'),
+            Action(FluentIcon.CUT, '剪切'),
+            Action(FluentIcon.PASTE, '粘贴'),
+            Action(FluentIcon.CANCEL, '取消'),
+            Action('全选'),
+        ])
+        button.setMenu(menu)
+        return button
+
+    # 添加下拉按钮到CommandBar
+    dropdown_button = create_dropdown_button()
+    command_bar.addWidget(dropdown_button)
+
+    # 添加隐藏动作
+    command_bar.addHiddenAction(
+        Action(FluentIcon.SCROLL, '排序文件', triggered=lambda: print("排序文件"))
+    )
+    command_bar.addHiddenAction(
+        Action(FluentIcon.SETTING, '批量设置', shortcut='Ctrl+S')
+    )

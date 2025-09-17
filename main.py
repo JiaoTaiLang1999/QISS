@@ -263,7 +263,6 @@ class Window(FramelessWindow):
         Controller_select(self.designer_ui)
         Controller_setting(self.designer_ui)
 
-        self.designer_ui.widget
 
     def initLayout(self):
         """初始化主布局，排列导航栏和内容区"""
