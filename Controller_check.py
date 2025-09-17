@@ -3,11 +3,13 @@ import pandas as pd
 from pathlib import Path
 
 from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import QHBoxLayout
+from PyQt6.QtGui import QColor
+from PyQt6.QtWidgets import QVBoxLayout, QWidget, QFileDialog
 from osgeo import gdal
 from collections import defaultdict
 
-from qfluentwidgets import CommandBar, TransparentDropDownPushButton, FluentIcon, RoundMenu, setFont, Action
+from qfluentwidgets import CommandBar, FluentIcon as FIF, RoundMenu, setFont, Action, LineEdit, \
+    TransparentPushButton, BodyLabel
 
 # --------------------------------------------------------------------------------------------------------------------------------
 # 核心功能区
@@ -805,7 +807,7 @@ def toolBar(ui):
                 item.widget().deleteLater()
     else:
         # 创建水平布局，保留适当边距和间距（关键：不消除间距）
-        top_layout = QHBoxLayout(top_widget)
+        top_layout = QVBoxLayout(top_widget)
         top_layout.setContentsMargins(10, 6, 10, 6)  # 上下边距6px，左右边距10px
         top_layout.setSpacing(8)  # 组件之间间距8px（保留间隔）
         top_widget.setLayout(top_layout)
@@ -819,18 +821,52 @@ def toolBar(ui):
     command_bar.setFixedHeight(top_widget.height() - 12)  # 减去上下边距，避免内容溢出
     setFont(command_bar, 12)
 
-    # 添加按钮的函数
-    def add_button(icon, text):
-        action = Action(icon, text, top_widget)
-        action.triggered.connect(lambda: print(f"点击了 {text} 按钮"))
-        command_bar.addAction(action)
+    # # 添加按钮的函数
+    # def add_button(icon, text):
+    #     action = Action(icon, text, top_widget)
+    #     action.triggered.connect(lambda: print(f"点击了 {text} 按钮"))
+    #     command_bar.addAction(action)
+
+    def addTiffPath(path_edit):
+        print('添加影像文件夹路径')
+        folder_path = QFileDialog.getExistingDirectory(
+            None,
+            "选择文件夹",  # 对话框标题
+            ".",  # 初始目录（当前目录）
+            QFileDialog.Option.ShowDirsOnly | QFileDialog.Option.DontResolveSymlinks
+        )
+
+        # 如果选择了文件夹，则更新标签显示
+        if folder_path:
+            path_edit.setText(f'影像路径：{folder_path}')
+
+    def startProcess(action2: Action,action3: Action):
+        action2.setDisabled(True)
+        action3.setDisabled(False)
+        print('开始处理')
+
+    def stopProcess(action3: Action,action2: Action):
+        action3.setDisabled(True)
+        action2.setDisabled(False)
+        print('停止处理')
 
     # 添加按钮组
-    add_button(FluentIcon.ADD, '添加文件')
+    action1 = Action(FIF.ADD_TO, '添加影像文件夹路径', top_widget)
+    action1.triggered.connect(lambda :addTiffPath(path_edit))
+    command_bar.addAction(action1)
     command_bar.addSeparator()
-    add_button(FluentIcon.EDIT, '编辑影像')
-    add_button(FluentIcon.COPY, '复制路径')
-    add_button(FluentIcon.SHARE, '分享结果')
+    action2 = Action(FIF.PLAY.colored(QColor("green"),QColor("green")), '开始处理', top_widget)
+    action2.triggered.connect(lambda :startProcess(action2,action3))
+    command_bar.addAction(action2)
+    action3 = Action(FIF.CLOSE.colored(QColor("red"),QColor("red")), '停止处理', top_widget)
+    action3.setDisabled(True)
+    action3.triggered.connect(lambda :stopProcess(action3,action2))
+    command_bar.addAction(action3)
+
+    path_edit = BodyLabel("请选择影像文件夹...")
+    path_edit.setTextColor(QColor("gray"), QColor("gray"))  # 浅色主题，深色主题
+    top_widget.layout().addWidget(path_edit)
+
 
 
 def Controller_check(ui):

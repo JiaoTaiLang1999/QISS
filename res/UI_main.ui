@@ -68,10 +68,22 @@
         <widget class="QWidget" name="widget_check_2_display" native="true">
          <layout class="QHBoxLayout" name="horizontalLayout_3">
           <item>
-           <widget class="QWidget" name="widget_check_display_1_chartAndLog" native="true"/>
+           <widget class="QWidget" name="widget_check_display_1_table" native="true">
+            <layout class="QVBoxLayout" name="verticalLayout_2">
+             <item>
+              <widget class="QTextEdit" name="textEdit"/>
+             </item>
+            </layout>
+           </widget>
           </item>
           <item>
-           <widget class="QWidget" name="widget_check_display_2_table" native="true"/>
+           <widget class="QWidget" name="widget_check_display_2_chartAndLog" native="true">
+            <layout class="QVBoxLayout" name="verticalLayout_7">
+             <item>
+              <widget class="QTableWidget" name="tableWidget"/>
+             </item>
+            </layout>
+           </widget>
           </item>
          </layout>
         </widget>
