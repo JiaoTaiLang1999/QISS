@@ -5,6 +5,7 @@ from pathlib import Path
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import QVBoxLayout, QWidget, QFileDialog
+from fontTools.varLib.interpolatable import DEFAULT_KINKINESS
 from osgeo import gdal
 from collections import defaultdict
 
@@ -867,8 +868,17 @@ def toolBar(ui):
     path_edit.setTextColor(QColor("gray"), QColor("gray"))  # 浅色主题，深色主题
     top_widget.layout().addWidget(path_edit)
 
+# 数据展示栏
+def displayBar(ui):
+    ui.tableWidget_1_allInfo.setBorderVisible(True)
+    ui.tableWidget_1_allInfo.setBorderRadius(8)
 
+    ui.tableWidget_2_lakeInfo.setBorderVisible(True)
+    ui.tableWidget_2_lakeInfo.setBorderRadius(8)
 
 def Controller_check(ui):
     # 加载工具栏
     toolBar(ui)
+
+    # 加载数据展示栏
+    displayBar(ui)
